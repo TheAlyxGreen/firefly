@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"time"
-	
+
 	"github.com/bluesky-social/indigo/api/bsky"
 )
 
@@ -93,7 +93,7 @@ func OldToNewNotification(oldNotif *bsky.NotificationListNotifications_Notificat
 	if err == nil {
 		newNotif.LinkedUser = newAuthor
 	}
-	
+
 	// reasons grabbed from here: https://atproto.blue/en/latest/atproto/atproto_client.models.app.bsky.notification.list_notifications.html
 	// 7/12/25 (timestamp because they keep fucking changing it)
 	switch oldNotif.Reason {
@@ -146,7 +146,7 @@ func OldToNewNotification(oldNotif *bsky.NotificationListNotifications_Notificat
 			newNotif.LinkedPost.Cid = oldNotif.Cid
 		}
 	}
-	
+
 	return newNotif, nil
 }
 
@@ -177,9 +177,9 @@ func (f *Firefly) GetNotifications(fromBefore time.Time, count int, priority boo
 			return nil, err
 		}
 		if newNotif.Reason == NewLike {
-			strippedUser := f.Self.StripDetails()
+			strippedUser := f.Self
 			if newNotif.LinkedPost != nil {
-				newNotif.LinkedPost.Author = &strippedUser
+				newNotif.LinkedPost.Author = strippedUser
 			}
 		}
 		newNotifications = append(newNotifications, newNotif)

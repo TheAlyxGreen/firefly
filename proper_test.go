@@ -37,8 +37,8 @@ func TestSearchPostsIntegration(t *testing.T) {
 			json.NewEncoder(w).Encode(map[string]interface{}{
 				"posts": []map[string]interface{}{
 					{
-						"uri":    "at://did:plc:test/app.bsky.feed.post/123",
-						"cid":    "bafkreitest123",
+						"uri": "at://did:plc:test/app.bsky.feed.post/123",
+						"cid": "bafkreitest123",
 						"record": map[string]interface{}{
 							"$type":     "app.bsky.feed.post",
 							"text":      "Hello #golang world!",
@@ -68,10 +68,10 @@ func TestSearchPostsIntegration(t *testing.T) {
 
 	// Test that functional options actually work end-to-end
 	posts, err := client.SearchPosts("golang",
-		SearchByAuthor("test.bsky.social"),
-		SearchByLanguage("en"),
+		50,
+		PostsByAuthor("test.bsky.social"),
+		PostsByLanguage("en"),
 		SearchSortBy(SortByTop),
-		SearchLimit(50),
 	)
 
 	require.NoError(t, err)
@@ -208,14 +208,14 @@ func TestErrorHandling(t *testing.T) {
 			// Return 404 to test error handling
 			w.WriteHeader(http.StatusNotFound)
 			json.NewEncoder(w).Encode(map[string]interface{}{
-				"error": "ProfileNotFound",
+				"error":   "ProfileNotFound",
 				"message": "Profile not found",
 			})
 		case "/xrpc/app.bsky.feed.searchPosts":
 			// Return 400 to test search error handling
 			w.WriteHeader(http.StatusBadRequest)
 			json.NewEncoder(w).Encode(map[string]interface{}{
-				"error": "InvalidQuery",
+				"error":   "InvalidQuery",
 				"message": "Invalid search query",
 			})
 		default:
@@ -234,41 +234,8 @@ func TestErrorHandling(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to fetch data")
 
 	// Test SearchPosts error handling
-	posts, err := client.SearchPosts("invalid query")
+	posts, err := client.SearchPosts("invalid query", 25)
 	assert.Error(t, err)
 	assert.Nil(t, posts)
 	assert.Contains(t, err.Error(), "search failed")
-}
-
-func TestSimplePostSearchUsesSearchPosts(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/xrpc/com.atproto.server.describeServer":
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"did": "did:web:test.example",
-			})
-		case "/xrpc/app.bsky.feed.searchPosts":
-			// Verify SimplePostSearch correctly maps to SearchPosts with limit
-			query := r.URL.Query()
-			assert.Equal(t, "test query", query.Get("q"))
-			assert.Equal(t, "25", query.Get("limit"))
-
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"posts": []interface{}{},
-			})
-		}
-	}))
-	defer server.Close()
-
-	client, err := NewCustomInstance(context.Background(), server.URL, &http.Client{})
-	require.NoError(t, err)
-
-	posts, err := client.SimplePostSearch("test query", 25)
-	require.NoError(t, err)
-	assert.NotNil(t, posts)
-	assert.Len(t, posts, 0) // Empty result, but no error
 }

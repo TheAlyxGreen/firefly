@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"time"
-	
+
 	"github.com/bluesky-social/indigo/api/atproto"
 	"github.com/bluesky-social/indigo/api/bsky"
 	"github.com/bluesky-social/indigo/xrpc"
@@ -32,23 +32,24 @@ type Firefly struct {
 	ctx               context.Context
 	sessionExpiration time.Time
 	cancelRefresh     context.CancelFunc
-	
+
 	// ErrorChan receives errors from background operations like token refresh.
 	// Users should monitor this channel to handle authentication failures.
 	ErrorChan chan error
-	
+
 	// Self contains the authenticated user's profile information, populated after Login().
-	Self      *UserDetailed
+	Self *User
 }
 
 // NewDefaultInstance creates a new Firefly client using the default BlueSky server (bsky.social)
 // and a standard HTTP client. This is the recommended way to create a client for most users.
 //
 // Example:
-//   client, err := firefly.NewDefaultInstance()
-//   if err != nil {
-//       log.Fatal(err)
-//   }
+//
+//	client, err := firefly.NewDefaultInstance()
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
 func NewDefaultInstance() (*Firefly, error) {
 	return NewCustomInstance(context.Background(), defaultBskyServer, new(http.Client))
 }
@@ -59,9 +60,10 @@ func NewDefaultInstance() (*Firefly, error) {
 // Returns an error if the server cannot be reached or verified.
 //
 // Example:
-//   ctx := context.WithTimeout(context.Background(), 30*time.Second)
-//   client := &http.Client{Timeout: 10 * time.Second}
-//   firefly, err := firefly.NewCustomInstance(ctx, "https://bsky.social", client)
+//
+//	ctx := context.WithTimeout(context.Background(), 30*time.Second)
+//	client := &http.Client{Timeout: 10 * time.Second}
+//	firefly, err := firefly.NewCustomInstance(ctx, "https://bsky.social", client)
 func NewCustomInstance(ctx context.Context, server string, client *http.Client) (*Firefly, error) {
 	local := &xrpc.Client{
 		Client: client,
@@ -70,7 +72,7 @@ func NewCustomInstance(ctx context.Context, server string, client *http.Client) 
 	if _, err := atproto.ServerDescribeServer(ctx, local); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrBadServer, err)
 	}
-	
+
 	return &Firefly{
 		ctx:           ctx,
 		client:        local,
@@ -84,11 +86,12 @@ func NewCustomInstance(ctx context.Context, server string, client *http.Client) 
 // The username can be either a handle (e.g., "alice.bsky.social") or email address.
 //
 // Example:
-//   err := client.Login("alice.bsky.social", "my-app-password")
-//   if err != nil {
-//       log.Fatal("Login failed:", err)
-//   }
-//   fmt.Printf("Logged in as: %s\n", client.Self.DisplayName)
+//
+//	err := client.Login("alice.bsky.social", "my-app-password")
+//	if err != nil {
+//	    log.Fatal("Login failed:", err)
+//	}
+//	fmt.Printf("Logged in as: %s\n", client.Self.DisplayName)
 func (f *Firefly) Login(username string, password string) error {
 	if _, err := atproto.ServerDescribeServer(f.ctx, f.client); err != nil {
 		return fmt.Errorf("%w: %w", ErrBadServer, err)
@@ -101,7 +104,7 @@ func (f *Firefly) Login(username string, password string) error {
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrBadLogin, err)
 	}
-	
+
 	authToken, _, err := jwt.NewParser().ParseUnverified(authOutput.AccessJwt, jwt.MapClaims{})
 	if authToken == nil || (err != nil && !errors.Is(err, jwt.ErrTokenUnverifiable)) {
 		return fmt.Errorf("%w: %w", ErrBadResponse, err)
@@ -110,21 +113,21 @@ func (f *Firefly) Login(username string, password string) error {
 	if expDate == nil || err != nil {
 		return fmt.Errorf("%w: %w", ErrBadResponse, err)
 	}
-	
+
 	f.sessionExpiration = expDate.Time
 	if f.sessionExpiration.Sub(time.Now()).Seconds() < 60 {
 		return ErrBadSessionDuration
 	}
-	
+
 	f.client.Auth = &xrpc.AuthInfo{
 		AccessJwt:  authOutput.AccessJwt,
 		RefreshJwt: authOutput.RefreshJwt,
 		Handle:     authOutput.Handle,
 		Did:        authOutput.Did,
 	}
-	
+
 	f.scheduleSessionRefresh()
-	
+
 	profile, err := bsky.ActorGetProfile(f.ctx, f.client, authOutput.Handle)
 	if err == nil {
 		selfUser, err := OldToNewDetailedUser(profile)
@@ -132,7 +135,7 @@ func (f *Firefly) Login(username string, password string) error {
 			f.Self = selfUser
 		}
 	}
-	
+
 	return nil
 }
 
@@ -142,7 +145,7 @@ func (f *Firefly) updateSession() error {
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrFailedRefresh, err)
 	}
-	
+
 	authToken, _, err := jwt.NewParser().ParseUnverified(authOutput.AccessJwt, jwt.MapClaims{})
 	if authToken == nil || (err != nil && !errors.Is(err, jwt.ErrTokenUnverifiable)) {
 		return fmt.Errorf("%w: %w", ErrFailedRefresh, err)
@@ -151,19 +154,19 @@ func (f *Firefly) updateSession() error {
 	if expDate == nil || err != nil {
 		return fmt.Errorf("%w: %w", ErrFailedRefresh, err)
 	}
-	
+
 	f.sessionExpiration = expDate.Time
 	if f.sessionExpiration.Sub(time.Now()).Seconds() < 60 {
 		return ErrBadSessionDuration
 	}
-	
+
 	f.client.Auth = &xrpc.AuthInfo{
 		AccessJwt:  authOutput.AccessJwt,
 		RefreshJwt: authOutput.RefreshJwt,
 		Handle:     authOutput.Handle,
 		Did:        authOutput.Did,
 	}
-	
+
 	return nil
 }
 
