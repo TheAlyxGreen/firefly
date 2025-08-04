@@ -72,7 +72,7 @@ type Notification struct {
 }
 
 // OldToNewNotification converts bsky notifications to Firefly notifications
-func OldToNewNotification(oldNotif *bsky.NotificationListNotifications_Notification) (*Notification, error) {
+func (f *Firefly) OldToNewNotification(oldNotif *bsky.NotificationListNotifications_Notification) (*Notification, error) {
 	if oldNotif == nil {
 		return nil, ErrNilNotif
 	}
@@ -136,7 +136,12 @@ func OldToNewNotification(oldNotif *bsky.NotificationListNotifications_Notificat
 		newNotif.Reason == NewRepost ||
 		newNotif.Reason == NewReply ||
 		newNotif.Reason == NewQuote {
-		newPost, err := OldToNewPost(oldNotif.Record.Val.(*bsky.FeedPost))
+		serverHost := f.client.Host
+		userDID := ""
+		if f.client.Auth != nil {
+			userDID = f.client.Auth.Did
+		}
+		newPost, err := OldToNewPost(oldNotif.Record.Val.(*bsky.FeedPost), serverHost, userDID)
 		if err == nil {
 			if newNotif.Reason != NewLike {
 				newPost.Author = newNotif.LinkedUser
@@ -172,7 +177,7 @@ func (f *Firefly) GetNotifications(fromBefore time.Time, count int, priority boo
 	}
 	var newNotifications []*Notification
 	for _, notif := range notifications.Notifications {
-		newNotif, err := OldToNewNotification(notif)
+		newNotif, err := f.OldToNewNotification(notif)
 		if err != nil {
 			return nil, err
 		}

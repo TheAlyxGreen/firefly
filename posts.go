@@ -28,6 +28,17 @@ const (
 	TagFacet
 )
 
+// EmbedType identifies the type of embedded content in a post.
+type EmbedType int
+
+const (
+	EmbedTypeUnknown EmbedType = iota
+	EmbedTypeImages
+	EmbedTypeExternal
+	EmbedTypeRecord
+	EmbedTypeVideo
+)
+
 func (ft FacetType) String() string {
 	switch ft {
 	case LinkFacet:
@@ -38,6 +49,83 @@ func (ft FacetType) String() string {
 		return "Tag Facet"
 	default:
 		return "Unknown Facet"
+	}
+}
+
+func (et EmbedType) String() string {
+	switch et {
+	case EmbedTypeImages:
+		return "Images"
+	case EmbedTypeExternal:
+		return "External Link"
+	case EmbedTypeRecord:
+		return "Quote Post"
+	case EmbedTypeVideo:
+		return "Video"
+	default:
+		return "Unknown Embed"
+	}
+}
+
+// EmbedImage represents an image embedded in a post.
+type EmbedImage struct {
+	AltText string `json:"altText" cborgen:"altText"`
+	URL     string `json:"url" cborgen:"url"`
+}
+
+// EmbedLink represents an external link embedded in a post.
+type EmbedLink struct {
+	URL         string `json:"url" cborgen:"url"`
+	Title       string `json:"title" cborgen:"title"`
+	Description string `json:"description" cborgen:"description"`
+	ThumbURL    string `json:"thumbUrl,omitempty" cborgen:"thumbUrl,omitempty"`
+}
+
+// EmbedQuote represents a quoted post embedded in a post.
+type EmbedQuote struct {
+	URI       string    `json:"uri" cborgen:"uri"`
+	Author    *User     `json:"author" cborgen:"author"`
+	Text      string    `json:"text" cborgen:"text"`
+	CreatedAt time.Time `json:"createdAt" cborgen:"createdAt"`
+}
+
+// EmbedVideo represents a video embedded in a post.
+type EmbedVideo struct {
+	URL     string `json:"url" cborgen:"url"`
+	AltText string `json:"altText,omitempty" cborgen:"altText,omitempty"`
+}
+
+// Embed represents embedded content in a post with a simplified, flattened structure.
+type Embed struct {
+	Type     EmbedType            `json:"type" cborgen:"type"`
+	Images   []EmbedImage         `json:"images,omitempty" cborgen:"images,omitempty"`
+	External *EmbedLink           `json:"external,omitempty" cborgen:"external,omitempty"`
+	Record   *EmbedQuote          `json:"record,omitempty" cborgen:"record,omitempty"`
+	Video    *EmbedVideo          `json:"video,omitempty" cborgen:"video,omitempty"`
+	Raw      *bsky.FeedPost_Embed `json:"-" cborgen:"-"`
+}
+
+func (e Embed) String() string {
+	switch e.Type {
+	case EmbedTypeImages:
+		return fmt.Sprintf("Embed{Type: %s, Images: %d}", e.Type, len(e.Images))
+	case EmbedTypeExternal:
+		if e.External != nil {
+			return fmt.Sprintf("Embed{Type: %s, URL: %s}", e.Type, e.External.URL)
+		}
+		return fmt.Sprintf("Embed{Type: %s}", e.Type)
+	case EmbedTypeRecord:
+		if e.Record != nil {
+			return fmt.Sprintf("Embed{Type: %s, URI: %s}", e.Type, e.Record.URI)
+		}
+		return fmt.Sprintf("Embed{Type: %s}", e.Type)
+	case EmbedTypeVideo:
+		if e.Video != nil {
+			return fmt.Sprintf("Embed{Type: %s, URL: %s}", e.Type, e.Video.URL)
+		}
+		return fmt.Sprintf("Embed{Type: %s}", e.Type)
+	default:
+		return fmt.Sprintf("Embed{Type: %s}", e.Type)
 	}
 }
 
@@ -111,6 +199,101 @@ func OldToNewRefPointer(oldRef *atproto.RepoStrongRef) *PostRef {
 	}
 }
 
+// OldToNewEmbed converts BlueSky's complex embed types to Firefly's simplified Embed structure
+func OldToNewEmbed(oldEmbed *bsky.FeedPost_Embed, serverHost, userDID string) (*Embed, error) {
+	if oldEmbed == nil {
+		return nil, nil
+	}
+
+	embed := &Embed{
+		Type: EmbedTypeUnknown,
+		Raw:  oldEmbed,
+	}
+
+	// Handle EmbedImages
+	if oldEmbed.EmbedImages != nil {
+		embed.Type = EmbedTypeImages
+		embed.Images = make([]EmbedImage, len(oldEmbed.EmbedImages.Images))
+
+		for i, img := range oldEmbed.EmbedImages.Images {
+			imageURL := ""
+			if img.Image != nil && img.Image.Ref.String() != "" {
+				// Construct blob URL: https://server/xrpc/com.atproto.sync.getBlob?did=userDID&cid=blobCID
+				imageURL = fmt.Sprintf("%s/xrpc/com.atproto.sync.getBlob?did=%s&cid=%s",
+					serverHost, userDID, img.Image.Ref.String())
+			}
+			embed.Images[i] = EmbedImage{
+				AltText: img.Alt,
+				URL:     imageURL,
+			}
+		}
+	}
+
+	// Handle EmbedExternal
+	if oldEmbed.EmbedExternal != nil && oldEmbed.EmbedExternal.External != nil {
+		embed.Type = EmbedTypeExternal
+		thumbURL := ""
+		if oldEmbed.EmbedExternal.External.Thumb != nil && oldEmbed.EmbedExternal.External.Thumb.Ref.String() != "" {
+			// Construct blob URL for thumbnail
+			thumbURL = fmt.Sprintf("%s/xrpc/com.atproto.sync.getBlob?did=%s&cid=%s",
+				serverHost, userDID, oldEmbed.EmbedExternal.External.Thumb.Ref.String())
+		}
+		embed.External = &EmbedLink{
+			URL:         oldEmbed.EmbedExternal.External.Uri,
+			Title:       oldEmbed.EmbedExternal.External.Title,
+			Description: oldEmbed.EmbedExternal.External.Description,
+			ThumbURL:    thumbURL,
+		}
+	}
+
+	// Handle EmbedRecord (quote posts)
+	if oldEmbed.EmbedRecord != nil && oldEmbed.EmbedRecord.Record != nil {
+		embed.Type = EmbedTypeRecord
+		embed.Record = &EmbedQuote{
+			URI:       oldEmbed.EmbedRecord.Record.Uri,
+			Author:    nil,         // Would need to resolve from record data
+			Text:      "",          // Would need to extract from record data
+			CreatedAt: time.Time{}, // Would need to extract from record data
+		}
+	}
+
+	// Handle EmbedVideo
+	if oldEmbed.EmbedVideo != nil {
+		embed.Type = EmbedTypeVideo
+		videoURL := ""
+		if oldEmbed.EmbedVideo.Video != nil && oldEmbed.EmbedVideo.Video.Ref.String() != "" {
+			// Construct blob URL for video
+			videoURL = fmt.Sprintf("%s/xrpc/com.atproto.sync.getBlob?did=%s&cid=%s",
+				serverHost, userDID, oldEmbed.EmbedVideo.Video.Ref.String())
+		}
+		altText := ""
+		if oldEmbed.EmbedVideo.Alt != nil {
+			altText = *oldEmbed.EmbedVideo.Alt
+		}
+		embed.Video = &EmbedVideo{
+			URL:     videoURL,
+			AltText: altText,
+		}
+	}
+
+	// Handle EmbedRecordWithMedia (combination)
+	if oldEmbed.EmbedRecordWithMedia != nil {
+		// This is complex - it contains both a record and media
+		// For simplicity, we'll treat it as a record type and note the media in Raw
+		embed.Type = EmbedTypeRecord
+		if oldEmbed.EmbedRecordWithMedia.Record != nil && oldEmbed.EmbedRecordWithMedia.Record.Record != nil {
+			embed.Record = &EmbedQuote{
+				URI:       oldEmbed.EmbedRecordWithMedia.Record.Record.Uri,
+				Author:    nil,
+				Text:      "",
+				CreatedAt: time.Time{},
+			}
+		}
+	}
+
+	return embed, nil
+}
+
 // ReplyInfo contains thread information for posts that are replies.
 // ReplyTarget is the immediate parent post, while ReplyRoot is the top-level post in the thread.
 type ReplyInfo struct { // nil if not a reply
@@ -122,21 +305,21 @@ type ReplyInfo struct { // nil if not a reply
 // This includes the post text, rich text formatting, creation time, language, and thread information.
 // Some fields like Uri, Cid, and Author may be populated depending on the context where the post was retrieved.
 type FeedPost struct {
-	Uri       string    `json:"uri" cborgen:"uri"`       // may be empty
-	Cid       string    `json:"cid" cborgen:"cid"`       // may be empty
-	Author    *User     `json:"author" cborgen:"author"` // may be nil
-	CreatedAt time.Time `json:"createdAt" cborgen:"createdAt"`
-	//Embed     *FeedPost_Embed `json:"embed,omitempty" cborgen:"embed,omitempty"`
+	Uri       string          `json:"uri" cborgen:"uri"`       // may be empty
+	Cid       string          `json:"cid" cborgen:"cid"`       // may be empty
+	Author    *User           `json:"author" cborgen:"author"` // may be nil
+	CreatedAt time.Time       `json:"createdAt" cborgen:"createdAt"`
 	Facets    []RichTextFacet `json:"facets" cborgen:"facets"`
 	Text      string          `json:"text" cborgen:"text"`
 	Tags      []string        `json:"tags" cborgen:"tags"`
 	Languages []string        `json:"languages" cborgen:"languages"`
 	ReplyInfo *ReplyInfo      `json:"replyInfo" cborgen:"replyInfo"`
+	Embed     *Embed          `json:"embed,omitempty" cborgen:"embed,omitempty"`
 	Raw       *bsky.FeedPost
 }
 
 // OldToNewPost converts bsky posts into Firefly FeedPost types
-func OldToNewPost(oldPost *bsky.FeedPost) (*FeedPost, error) {
+func OldToNewPost(oldPost *bsky.FeedPost, serverHost, userDID string) (*FeedPost, error) {
 	if oldPost == nil {
 		return nil, ErrNilPost
 	}
@@ -173,6 +356,12 @@ func OldToNewPost(oldPost *bsky.FeedPost) (*FeedPost, error) {
 		}
 	}
 
+	// Convert embed if present
+	newEmbed, err := OldToNewEmbed(oldPost.Embed, serverHost, userDID)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrInvalidPost, err)
+	}
+
 	newPost := &FeedPost{
 		CreatedAt: CreatedAt,
 		Facets:    NewFacets,
@@ -180,6 +369,7 @@ func OldToNewPost(oldPost *bsky.FeedPost) (*FeedPost, error) {
 		ReplyInfo: NewReplyInfo,
 		Languages: oldPost.Langs,
 		Tags:      oldPost.Tags,
+		Embed:     newEmbed,
 		Raw:       oldPost,
 	}
 	return newPost, nil

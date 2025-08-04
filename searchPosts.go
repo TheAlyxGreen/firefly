@@ -66,7 +66,12 @@ func (f *Firefly) SearchPosts(query string, limit int, options *PostSearch) ([]*
 	}
 	posts = make([]*FeedPost, len(results.Posts))
 	for i, postView := range results.Posts {
-		newPost, err := OldToNewPost(postView.Record.Val.(*bsky.FeedPost))
+		serverHost := f.client.Host
+		userDID := ""
+		if f.client.Auth != nil {
+			userDID = f.client.Auth.Did
+		}
+		newPost, err := OldToNewPost(postView.Record.Val.(*bsky.FeedPost), serverHost, userDID)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %w", ErrSearchFailed, err)
 		} else {
