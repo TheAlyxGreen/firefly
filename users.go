@@ -16,18 +16,19 @@ var (
 // User represents a BlueSky user profile that can contain either basic or detailed information.
 // Optional fields use pointers for nil-safe handling. Detailed info (follower counts, etc.) may be nil for basic profiles.
 type User struct {
-	Avatar         *string   `json:"avatar,omitempty" cborgen:"avatar,omitempty"`
-	Banner         *string   `json:"banner,omitempty" cborgen:"banner,omitempty"`
-	CreatedAt      time.Time `json:"createdAt,omitempty" cborgen:"createdAt,omitempty"`
-	Description    *string   `json:"description,omitempty" cborgen:"description,omitempty"`
-	Did            string    `json:"did" cborgen:"did"`
-	DisplayName    *string   `json:"displayName,omitempty" cborgen:"displayName,omitempty"`
-	Handle         string    `json:"handle" cborgen:"handle"`
-	IndexedAt      time.Time `json:"indexedAt,omitempty" cborgen:"indexedAt,omitempty"`
-	FollowersCount *int      `json:"followersCount,omitempty" cborgen:"followersCount,omitempty"`
-	FollowsCount   *int      `json:"followsCount,omitempty" cborgen:"followsCount,omitempty"`
-	PinnedPost     *PostRef  `json:"pinnedPost,omitempty" cborgen:"pinnedPost,omitempty"`
-	PostsCount     *int      `json:"postsCount,omitempty" cborgen:"postsCount,omitempty"`
+	Avatar         *string    `json:"avatar,omitempty" cborgen:"avatar,omitempty"`
+	Banner         *string    `json:"banner,omitempty" cborgen:"banner,omitempty"`
+	CreatedAt      time.Time  `json:"createdAt,omitempty" cborgen:"createdAt,omitempty"`
+	Description    *string    `json:"description,omitempty" cborgen:"description,omitempty"`
+	Did            string     `json:"did" cborgen:"did"`
+	DisplayName    *string    `json:"displayName,omitempty" cborgen:"displayName,omitempty"`
+	Handle         string     `json:"handle" cborgen:"handle"`
+	IndexedAt      *time.Time `json:"indexedAt,omitempty" cborgen:"indexedAt,omitempty"`
+	FollowersCount *int       `json:"followersCount,omitempty" cborgen:"followersCount,omitempty"`
+	FollowsCount   *int       `json:"followsCount,omitempty" cborgen:"followsCount,omitempty"`
+	PinnedPost     *PostRef   `json:"pinnedPost,omitempty" cborgen:"pinnedPost,omitempty"`
+	PostsCount     *int       `json:"postsCount,omitempty" cborgen:"postsCount,omitempty"`
+	RawBasic       *bsky.ActorDefs_ProfileViewBasic
 	Raw            *bsky.ActorDefs_ProfileView
 	RawDetailed    *bsky.ActorDefs_ProfileViewDetailed
 	//Associated   *ActorDefs_ProfileAssociated       `json:"associated,omitempty" cborgen:"associated,omitempty"`
@@ -39,6 +40,24 @@ type User struct {
 
 func (u *User) String() string {
 	return fmt.Sprintf("User{DID: %s, Handle: %s}", u.Did, u.Handle)
+}
+
+func OldToNewUserBasic(oldUser *bsky.ActorDefs_ProfileViewBasic) (*User, error) {
+	if oldUser == nil {
+		return nil, ErrNilUser
+	}
+	CreatedAt, err := time.Parse(time.RFC3339, *oldUser.CreatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrInvalidUser, err)
+	}
+	return &User{
+		Avatar:      oldUser.Avatar,
+		CreatedAt:   CreatedAt,
+		Did:         oldUser.Did,
+		DisplayName: oldUser.DisplayName,
+		Handle:      oldUser.Handle,
+		RawBasic:    oldUser,
+	}, nil
 }
 
 func OldToNewUser(oldUser *bsky.ActorDefs_ProfileView) (*User, error) {
@@ -60,7 +79,7 @@ func OldToNewUser(oldUser *bsky.ActorDefs_ProfileView) (*User, error) {
 		Did:         oldUser.Did,
 		DisplayName: oldUser.DisplayName,
 		Handle:      oldUser.Handle,
-		IndexedAt:   IndexedAt,
+		IndexedAt:   &IndexedAt,
 		Raw:         oldUser,
 		RawDetailed: nil,
 	}
@@ -103,7 +122,7 @@ func OldToNewDetailedUser(oldUser *bsky.ActorDefs_ProfileViewDetailed) (*User, e
 		FollowersCount: &followersCount,
 		FollowsCount:   &followsCount,
 		Handle:         oldUser.Handle,
-		IndexedAt:      IndexedAt,
+		IndexedAt:      &IndexedAt,
 		PinnedPost:     OldToNewRefPointer(oldUser.PinnedPost),
 		PostsCount:     &postsCount,
 		RawDetailed:    oldUser,

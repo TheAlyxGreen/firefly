@@ -81,14 +81,6 @@ type EmbedLink struct {
 	ThumbURL    string `json:"thumbUrl,omitempty" cborgen:"thumbUrl,omitempty"`
 }
 
-// EmbedQuote represents a quoted post embedded in a post.
-type EmbedQuote struct {
-	URI       string    `json:"uri" cborgen:"uri"`
-	Author    *User     `json:"author" cborgen:"author"`
-	Text      string    `json:"text" cborgen:"text"`
-	CreatedAt time.Time `json:"createdAt" cborgen:"createdAt"`
-}
-
 // EmbedVideo represents a video embedded in a post.
 type EmbedVideo struct {
 	URL     string `json:"url" cborgen:"url"`
@@ -100,7 +92,7 @@ type Embed struct {
 	Type     EmbedType            `json:"type" cborgen:"type"`
 	Images   []EmbedImage         `json:"images,omitempty" cborgen:"images,omitempty"`
 	External *EmbedLink           `json:"external,omitempty" cborgen:"external,omitempty"`
-	Record   *EmbedQuote          `json:"record,omitempty" cborgen:"record,omitempty"`
+	Record   *PostRef             `json:"record,omitempty" cborgen:"record,omitempty"`
 	Video    *EmbedVideo          `json:"video,omitempty" cborgen:"video,omitempty"`
 	Raw      *bsky.FeedPost_Embed `json:"-" cborgen:"-"`
 }
@@ -116,7 +108,7 @@ func (e Embed) String() string {
 		return fmt.Sprintf("Embed{Type: %s}", e.Type)
 	case EmbedTypeRecord:
 		if e.Record != nil {
-			return fmt.Sprintf("Embed{Type: %s, URI: %s}", e.Type, e.Record.URI)
+			return fmt.Sprintf("Embed{Type: %s, URI: %s}", e.Type, e.Record.Uri)
 		}
 		return fmt.Sprintf("Embed{Type: %s}", e.Type)
 	case EmbedTypeVideo:
@@ -200,7 +192,7 @@ func OldToNewRefPointer(oldRef *atproto.RepoStrongRef) *PostRef {
 }
 
 // OldToNewEmbed converts BlueSky's complex embed types to Firefly's simplified Embed structure
-func OldToNewEmbed(oldEmbed *bsky.FeedPost_Embed, serverHost, userDID string) (*Embed, error) {
+func (f *Firefly) OldToNewEmbed(oldEmbed *bsky.FeedPost_Embed, authorDID string) (*Embed, error) {
 	if oldEmbed == nil {
 		return nil, nil
 	}
@@ -220,7 +212,7 @@ func OldToNewEmbed(oldEmbed *bsky.FeedPost_Embed, serverHost, userDID string) (*
 			if img.Image != nil && img.Image.Ref.String() != "" {
 				// Construct blob URL: https://server/xrpc/com.atproto.sync.getBlob?did=userDID&cid=blobCID
 				imageURL = fmt.Sprintf("%s/xrpc/com.atproto.sync.getBlob?did=%s&cid=%s",
-					serverHost, userDID, img.Image.Ref.String())
+					f.client.Host, authorDID, img.Image.Ref.String())
 			}
 			embed.Images[i] = EmbedImage{
 				AltText: img.Alt,
@@ -236,7 +228,7 @@ func OldToNewEmbed(oldEmbed *bsky.FeedPost_Embed, serverHost, userDID string) (*
 		if oldEmbed.EmbedExternal.External.Thumb != nil && oldEmbed.EmbedExternal.External.Thumb.Ref.String() != "" {
 			// Construct blob URL for thumbnail
 			thumbURL = fmt.Sprintf("%s/xrpc/com.atproto.sync.getBlob?did=%s&cid=%s",
-				serverHost, userDID, oldEmbed.EmbedExternal.External.Thumb.Ref.String())
+				f.client.Host, authorDID, oldEmbed.EmbedExternal.External.Thumb.Ref.String())
 		}
 		embed.External = &EmbedLink{
 			URL:         oldEmbed.EmbedExternal.External.Uri,
@@ -249,11 +241,9 @@ func OldToNewEmbed(oldEmbed *bsky.FeedPost_Embed, serverHost, userDID string) (*
 	// Handle EmbedRecord (quote posts)
 	if oldEmbed.EmbedRecord != nil && oldEmbed.EmbedRecord.Record != nil {
 		embed.Type = EmbedTypeRecord
-		embed.Record = &EmbedQuote{
-			URI:       oldEmbed.EmbedRecord.Record.Uri,
-			Author:    nil,         // Would need to resolve from record data
-			Text:      "",          // Would need to extract from record data
-			CreatedAt: time.Time{}, // Would need to extract from record data
+		embed.Record = &PostRef{
+			Cid: oldEmbed.EmbedRecord.Record.Cid,
+			Uri: oldEmbed.EmbedRecord.Record.Uri,
 		}
 	}
 
@@ -264,7 +254,7 @@ func OldToNewEmbed(oldEmbed *bsky.FeedPost_Embed, serverHost, userDID string) (*
 		if oldEmbed.EmbedVideo.Video != nil && oldEmbed.EmbedVideo.Video.Ref.String() != "" {
 			// Construct blob URL for video
 			videoURL = fmt.Sprintf("%s/xrpc/com.atproto.sync.getBlob?did=%s&cid=%s",
-				serverHost, userDID, oldEmbed.EmbedVideo.Video.Ref.String())
+				f.client.Host, authorDID, oldEmbed.EmbedVideo.Video.Ref.String())
 		}
 		altText := ""
 		if oldEmbed.EmbedVideo.Alt != nil {
@@ -282,11 +272,9 @@ func OldToNewEmbed(oldEmbed *bsky.FeedPost_Embed, serverHost, userDID string) (*
 		// For simplicity, we'll treat it as a record type and note the media in Raw
 		embed.Type = EmbedTypeRecord
 		if oldEmbed.EmbedRecordWithMedia.Record != nil && oldEmbed.EmbedRecordWithMedia.Record.Record != nil {
-			embed.Record = &EmbedQuote{
-				URI:       oldEmbed.EmbedRecordWithMedia.Record.Record.Uri,
-				Author:    nil,
-				Text:      "",
-				CreatedAt: time.Time{},
+			embed.Record = &PostRef{
+				Cid: oldEmbed.EmbedRecordWithMedia.Record.Record.Cid,
+				Uri: oldEmbed.EmbedRecordWithMedia.Record.Record.Uri,
 			}
 		}
 	}
@@ -305,21 +293,30 @@ type ReplyInfo struct { // nil if not a reply
 // This includes the post text, rich text formatting, creation time, language, and thread information.
 // Some fields like Uri, Cid, and Author may be populated depending on the context where the post was retrieved.
 type FeedPost struct {
-	Uri       string          `json:"uri" cborgen:"uri"`       // may be empty
-	Cid       string          `json:"cid" cborgen:"cid"`       // may be empty
-	Author    *User           `json:"author" cborgen:"author"` // may be nil
-	CreatedAt time.Time       `json:"createdAt" cborgen:"createdAt"`
-	Facets    []RichTextFacet `json:"facets" cborgen:"facets"`
-	Text      string          `json:"text" cborgen:"text"`
-	Tags      []string        `json:"tags" cborgen:"tags"`
-	Languages []string        `json:"languages" cborgen:"languages"`
-	ReplyInfo *ReplyInfo      `json:"replyInfo" cborgen:"replyInfo"`
-	Embed     *Embed          `json:"embed,omitempty" cborgen:"embed,omitempty"`
-	Raw       *bsky.FeedPost
+	Uri         string          `json:"uri" cborgen:"uri"`       // may be empty
+	Cid         string          `json:"cid" cborgen:"cid"`       // may be empty
+	Author      *User           `json:"author" cborgen:"author"` // may be nil
+	CreatedAt   *time.Time      `json:"createdAt" cborgen:"createdAt"`
+	IndexedAt   *time.Time      `json:"indexedAt" cborgen:"indexedAt"`
+	Facets      []RichTextFacet `json:"facets" cborgen:"facets"`
+	Text        string          `json:"text" cborgen:"text"`
+	Tags        []string        `json:"tags" cborgen:"tags"`
+	Languages   []string        `json:"languages" cborgen:"languages"`
+	ReplyInfo   *ReplyInfo      `json:"replyInfo" cborgen:"replyInfo"`
+	LikeCount   *int            `json:"likeCount" cborgen:"likeCount"`
+	QuoteCount  *int            `json:"quoteCount" cborgen:"quoteCount"`
+	ReplyCount  *int            `json:"replyCount" cborgen:"replyCount"`
+	RepostCount *int            `json:"repostCount" cborgen:"repostCount"`
+	Embed       *Embed          `json:"embed,omitempty" cborgen:"embed,omitempty"`
+	Raw         *bsky.FeedPost
+	RawDetailed *bsky.FeedDefs_PostView
+	//Labels        []*comatprototypes.LabelDefs_Label `json:"labels,omitempty" cborgen:"labels,omitempty"`
+	//Threadgate    *FeedDefs_ThreadgateView           `json:"threadgate,omitempty" cborgen:"threadgate,omitempty"`
+	//Viewer        *FeedDefs_ViewerState              `json:"viewer,omitempty" cborgen:"viewer,omitempty"`
 }
 
 // OldToNewPost converts bsky posts into Firefly FeedPost types
-func OldToNewPost(oldPost *bsky.FeedPost, serverHost, userDID string) (*FeedPost, error) {
+func (f *Firefly) OldToNewPost(oldPost *bsky.FeedPost, authorDID string) (*FeedPost, error) {
 	if oldPost == nil {
 		return nil, ErrNilPost
 	}
@@ -357,13 +354,13 @@ func OldToNewPost(oldPost *bsky.FeedPost, serverHost, userDID string) (*FeedPost
 	}
 
 	// Convert embed if present
-	newEmbed, err := OldToNewEmbed(oldPost.Embed, serverHost, userDID)
+	newEmbed, err := f.OldToNewEmbed(oldPost.Embed, authorDID)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidPost, err)
 	}
 
 	newPost := &FeedPost{
-		CreatedAt: CreatedAt,
+		CreatedAt: &CreatedAt,
 		Facets:    NewFacets,
 		Text:      oldPost.Text,
 		ReplyInfo: NewReplyInfo,
@@ -373,6 +370,53 @@ func OldToNewPost(oldPost *bsky.FeedPost, serverHost, userDID string) (*FeedPost
 		Raw:       oldPost,
 	}
 	return newPost, nil
+}
+
+func (f *Firefly) OldToNewPostView(oldPostView *bsky.FeedDefs_PostView) (*FeedPost, error) {
+	if oldPostView == nil {
+		return nil, ErrNilPost
+	}
+	oldPost := oldPostView.Record.Val.(*bsky.FeedPost)
+	newPost, err := f.OldToNewPost(oldPost, oldPostView.Author.Did)
+	if err != nil {
+		return nil, err
+	}
+	newPost.RawDetailed = oldPostView
+	newPost.Uri = oldPostView.Uri
+	newPost.Cid = oldPostView.Cid
+
+	var likes int
+	if oldPostView.LikeCount != nil {
+		likes = int(*oldPostView.LikeCount)
+	}
+	newPost.LikeCount = &likes
+
+	var quotes int
+	if oldPostView.QuoteCount != nil {
+		quotes = int(*oldPostView.QuoteCount)
+	}
+	newPost.QuoteCount = &quotes
+
+	var replies int
+	if oldPostView.ReplyCount != nil {
+		replies = int(*oldPostView.ReplyCount)
+	}
+	newPost.ReplyCount = &replies
+
+	var reposts int
+	if oldPostView.RepostCount != nil {
+		reposts = int(*oldPostView.RepostCount)
+	}
+	newPost.RepostCount = &reposts
+
+	indexTime, err := time.Parse(time.RFC3339, oldPostView.IndexedAt)
+	if err != nil {
+		return newPost, fmt.Errorf("%w: %w", ErrInvalidPost, err)
+	}
+	newPost.IndexedAt = &indexTime
+	newPost.Author, err = OldToNewUserBasic(oldPostView.Author)
+
+	return newPost, err
 }
 
 func (p FeedPost) String() string {
