@@ -36,7 +36,8 @@ type PostSearch struct {
 	Until    *time.Time // Posts before this time
 }
 
-// SearchPosts searches for posts with optional filters
+// SearchPosts searches for posts with optional filters.
+// Pass nil for options to search without filters.
 func (f *Firefly) SearchPosts(query string, limit int, options *PostSearch) ([]*FeedPost, error) {
 	if options == nil {
 		options = &PostSearch{}

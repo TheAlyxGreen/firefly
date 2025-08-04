@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
-	
+
 	"github.com/bluesky-social/indigo/api/atproto"
 	"github.com/bluesky-social/indigo/api/bsky"
 	"github.com/bluesky-social/indigo/atproto/syntax"
@@ -115,15 +115,15 @@ func OldToNewRefPointer(oldRef *atproto.RepoStrongRef) *PostRef {
 // ReplyTarget is the immediate parent post, while ReplyRoot is the top-level post in the thread.
 type ReplyInfo struct { // nil if not a reply
 	ReplyTarget *PostRef `json:"replyTarget" cborgen:"replyTarget"` // post that this post is replying to
-	ReplyRoot   *PostRef `json:"replyParent" cborgen:"replyParent"` // top-level post the ReplyTarget is under
+	ReplyRoot   *PostRef `json:"replyRoot" cborgen:"replyRoot"`     // top-level post the ReplyTarget is under
 }
 
 // FeedPost represents a BlueSky post with all its content and metadata.
 // This includes the post text, rich text formatting, creation time, language, and thread information.
 // Some fields like Uri, Cid, and Author may be populated depending on the context where the post was retrieved.
 type FeedPost struct {
-	Uri       string    `json:"uri" cborgen:"uri"`       // may be nil
-	Cid       string    `json:"cid" cborgen:"cid"`       // may be nil
+	Uri       string    `json:"uri" cborgen:"uri"`       // may be empty
+	Cid       string    `json:"cid" cborgen:"cid"`       // may be empty
 	Author    *User     `json:"author" cborgen:"author"` // may be nil
 	CreatedAt time.Time `json:"createdAt" cborgen:"createdAt"`
 	//Embed     *FeedPost_Embed `json:"embed,omitempty" cborgen:"embed,omitempty"`
@@ -140,7 +140,7 @@ func OldToNewPost(oldPost *bsky.FeedPost) (*FeedPost, error) {
 	if oldPost == nil {
 		return nil, ErrNilPost
 	}
-	
+
 	CreatedAt, err := time.Parse(time.RFC3339, oldPost.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidPost, err)
@@ -172,7 +172,7 @@ func OldToNewPost(oldPost *bsky.FeedPost) (*FeedPost, error) {
 			}
 		}
 	}
-	
+
 	newPost := &FeedPost{
 		CreatedAt: CreatedAt,
 		Facets:    NewFacets,

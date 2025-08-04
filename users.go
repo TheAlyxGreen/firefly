@@ -13,8 +13,8 @@ var (
 	ErrInvalidUser = errors.New("invalid user")
 )
 
-// User represents a BlueSky user profile with basic information.
-// This is the lightweight version used in most contexts like post authors or notification senders.
+// User represents a BlueSky user profile that can contain either basic or detailed information.
+// Optional fields use pointers for nil-safe handling. Detailed info (follower counts, etc.) may be nil for basic profiles.
 type User struct {
 	Avatar         *string   `json:"avatar,omitempty" cborgen:"avatar,omitempty"`
 	Banner         *string   `json:"banner,omitempty" cborgen:"banner,omitempty"`
@@ -120,7 +120,9 @@ func OldToNewDetailedUser(oldUser *bsky.ActorDefs_ProfileViewDetailed) (*User, e
 //	if err != nil {
 //	    log.Fatal(err)
 //	}
-//	fmt.Printf("%s has %d followers\n", profile.DisplayName, profile.FollowersCount)
+//	if profile.FollowersCount != nil {
+//	    fmt.Printf("%s has %d followers\n", *profile.DisplayName, *profile.FollowersCount)
+//	}
 func (f *Firefly) GetProfile(actor string) (*User, error) {
 	profile, err := bsky.ActorGetProfile(f.ctx, f.client, actor)
 	if err != nil {
@@ -130,6 +132,8 @@ func (f *Firefly) GetProfile(actor string) (*User, error) {
 	return OldToNewDetailedUser(profile)
 }
 
+// SearchUsers searches for BlueSky users matching the query string.
+// Returns basic user profiles (detailed fields like follower counts may be nil).
 func (f *Firefly) SearchUsers(query string, cursor string, limit int) ([]*User, error) {
 
 	result, err := bsky.ActorSearchActors(f.ctx, f.client, cursor, int64(limit), query, "")
@@ -149,6 +153,8 @@ func (f *Firefly) SearchUsers(query string, cursor string, limit int) ([]*User, 
 	return users, nil
 }
 
+// GetSuggestedUsers returns user suggestions from BlueSky's recommendation algorithm.
+// Returns basic user profiles (detailed fields like follower counts may be nil).
 func (f *Firefly) GetSuggestedUsers(cursor string, limit int) ([]*User, error) {
 
 	result, err := bsky.ActorGetSuggestions(f.ctx, f.client, cursor, int64(limit))
