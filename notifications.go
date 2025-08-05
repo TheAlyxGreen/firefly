@@ -136,7 +136,7 @@ func (f *Firefly) OldToNewNotification(oldNotif *bsky.NotificationListNotificati
 		newNotif.Reason == NewRepost ||
 		newNotif.Reason == NewReply ||
 		newNotif.Reason == NewQuote {
-		newPost, err := f.OldToNewPost(oldNotif.Record.Val.(*bsky.FeedPost), oldNotif.Author.Did)
+		newPost, err := f.OldToNewPost(oldNotif.Record.Val.(*bsky.FeedPost), oldNotif.Uri)
 		if err == nil {
 			if newNotif.Reason != NewLike {
 				newPost.Author = newNotif.LinkedUser
