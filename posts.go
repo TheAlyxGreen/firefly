@@ -155,7 +155,7 @@ func (f *Firefly) OldToNewPostView(oldPostView *bsky.FeedDefs_PostView) (*FeedPo
 		return nil, ErrNilPost
 	}
 	oldPost := oldPostView.Record.Val.(*bsky.FeedPost)
-	newPost, err := f.OldToNewPost(oldPost, oldPostView.Uri)
+	newPost, err := f.OldToNewPost(oldPost, oldPostView.Author.Did)
 	if err != nil {
 		return nil, err
 	}
