@@ -75,10 +75,10 @@ type FeedPost struct {
 	QuoteCount  *int            `json:"quoteCount" cborgen:"quoteCount"`
 	ReplyCount  *int            `json:"replyCount" cborgen:"replyCount"`
 	RepostCount *int            `json:"repostCount" cborgen:"repostCount"`
+	Labels      []string        `json:"labels,omitempty" cborgen:"labels,omitempty"`
 	Embed       *Embed          `json:"embed,omitempty" cborgen:"embed,omitempty"`
 	Raw         *bsky.FeedPost
 	RawDetailed *bsky.FeedDefs_PostView
-	//Labels        []*comatprototypes.LabelDefs_Label `json:"labels,omitempty" cborgen:"labels,omitempty"`
 	//Threadgate    *FeedDefs_ThreadgateView           `json:"threadgate,omitempty" cborgen:"threadgate,omitempty"`
 	//Viewer        *FeedDefs_ViewerState              `json:"viewer,omitempty" cborgen:"viewer,omitempty"`
 }
@@ -137,6 +137,16 @@ func (f *Firefly) OldToNewPost(oldPost *bsky.FeedPost, authorDID string) (*FeedP
 		return nil, fmt.Errorf("%w: %w", ErrInvalidPost, err)
 	}
 
+	// Convert labels from BlueSky's complex structure to simple strings
+	var labels []string
+	if oldPost.Labels != nil && oldPost.Labels.LabelDefs_SelfLabels != nil {
+		for _, label := range oldPost.Labels.LabelDefs_SelfLabels.Values {
+			if label != nil {
+				labels = append(labels, label.Val)
+			}
+		}
+	}
+
 	newPost := &FeedPost{
 		CreatedAt: &CreatedAt,
 		Facets:    NewFacets,
@@ -144,6 +154,7 @@ func (f *Firefly) OldToNewPost(oldPost *bsky.FeedPost, authorDID string) (*FeedP
 		ReplyInfo: NewReplyInfo,
 		Languages: oldPost.Langs,
 		Tags:      oldPost.Tags,
+		Labels:    labels,
 		Embed:     newEmbed,
 		Raw:       oldPost,
 	}
