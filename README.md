@@ -180,23 +180,3 @@ Add content warnings with simple strings:
 ```go
 post.SetLabels("nudity", "graphic-media")
 ```
-
-## Development
-
-```bash
-go build
-go test ./...
-go fmt ./...
-```
-
-## License
-
-MIT License
-
-## Contributing
-
-Pull requests and issues welcome.
-
----
-
-Firefly wraps BlueSky's AT Protocol with simpler Go APIs. It handles the complex parts so you can focus on your application.
