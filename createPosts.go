@@ -228,7 +228,10 @@ func (d *DraftPost) IsValid() error {
 	return nil
 }
 
-// DraftToBskyPost converts the draft post to a BlueSky FeedPost with automatic facet generation
+// DraftToBskyPost converts the draft post to a BlueSky FeedPost with automatic facet generation.
+//
+// Note: This method performs network requests to resolve user handles to DIDs if mentions
+// are present in the draft. Ensure the provided context is valid.
 func (f *Firefly) DraftToBskyPost(ctx context.Context, draft *DraftPost) (*bsky.FeedPost, error) {
 	// Validate the post first
 	if err := draft.IsValid(); err != nil {
@@ -373,7 +376,10 @@ func (f *Firefly) DraftToBskyPost(ctx context.Context, draft *DraftPost) (*bsky.
 	return post, nil
 }
 
-// PublishDraftPost publishes a draft post to BlueSky
+// PublishDraftPost publishes a draft post to BlueSky.
+//
+// Note: This method performs network requests to resolve user handles to DIDs if mentions
+// are present in the draft (via DraftToBskyPost).
 func (f *Firefly) PublishDraftPost(ctx context.Context, draft *DraftPost) (*PostRef, error) {
 	// Convert to BlueSky format with automatic facet generation
 	bskyPost, err := f.DraftToBskyPost(ctx, draft)
