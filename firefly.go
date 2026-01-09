@@ -34,6 +34,7 @@ type Firefly struct {
 
 	// ErrorChan receives errors from background operations like token refresh.
 	// Users should monitor this channel to handle authentication failures.
+	// The channel is buffered to prevent blocking if errors are not immediately read.
 	ErrorChan chan error
 
 	// Self contains the authenticated user's profile information, populated after Login().
@@ -74,7 +75,7 @@ func NewCustomInstance(ctx context.Context, server string, client *http.Client) 
 
 	return &Firefly{
 		client:        local,
-		ErrorChan:     make(chan error),
+		ErrorChan:     make(chan error, 10), // Buffered to prevent blocking
 		cancelRefresh: nil,
 	}, nil
 }
@@ -183,7 +184,12 @@ func (f *Firefly) scheduleSessionRefresh() {
 
 			err := f.updateSession(ctx)
 			if err != nil {
-				f.ErrorChan <- err
+				// Non-blocking send to ErrorChan
+				select {
+				case f.ErrorChan <- err:
+				default:
+					// Channel is full, error is dropped to prevent blocking the goroutine
+				}
 				f.cancelRefresh = nil
 			} else {
 				f.scheduleSessionRefresh()
@@ -204,7 +210,12 @@ func (f *Firefly) RefreshSession(ctx context.Context) {
 	}
 	err := f.updateSession(ctx)
 	if err != nil {
-		f.ErrorChan <- err
+		// Non-blocking send to ErrorChan
+		select {
+		case f.ErrorChan <- err:
+		default:
+			// Channel is full, error is dropped
+		}
 		f.cancelRefresh = nil
 	} else {
 		f.scheduleSessionRefresh()
