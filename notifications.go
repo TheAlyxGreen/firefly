@@ -30,6 +30,8 @@ const (
 	AccountUnverified
 	NewLikeViaRepost
 	NewRepostViaRepost
+	NewSubscribedPost
+	NewContactMatch
 )
 
 func (r NotificationReason) String() string {
@@ -56,6 +58,10 @@ func (r NotificationReason) String() string {
 		return "New Like Via Repost"
 	case NewRepostViaRepost:
 		return "New Repost Via Repost"
+	case NewSubscribedPost:
+		return "New Subscribed Post"
+	case NewContactMatch:
+		return "New Contact Match"
 	default:
 		return "Unknown"
 	}
@@ -96,7 +102,7 @@ func (f *Firefly) OldToNewNotification(oldNotif *bsky.NotificationListNotificati
 	}
 
 	// reasons grabbed from here: https://atproto.blue/en/latest/atproto/atproto_client.models.app.bsky.notification.list_notifications.html
-	// 7/12/25 (timestamp because they keep fucking changing it)
+	// Jan-09-25 (timestamp because they keep fucking changing it)
 	switch oldNotif.Reason {
 	case "like":
 		newNotif.Reason = NewLike
@@ -130,6 +136,12 @@ func (f *Firefly) OldToNewNotification(oldNotif *bsky.NotificationListNotificati
 		break
 	case "repost-via-repost":
 		newNotif.Reason = NewRepostViaRepost
+		break
+	case "subscribed-post":
+		newNotif.Reason = NewSubscribedPost
+		break
+	case "contact-match":
+		newNotif.Reason = NewContactMatch
 		break
 	}
 	if newNotif.Reason == NewLike ||
