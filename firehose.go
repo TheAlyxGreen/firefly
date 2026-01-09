@@ -89,8 +89,9 @@ type FirehoseRepost struct {
 	URI     string   `json:"uri"`     // URI of the repost record
 }
 
-// FirehoseOptions configures firehose filtering and behavior
+// FirehoseOptions configures Firehose filtering and behavior
 type FirehoseOptions struct {
+	URL          *string  `json:"URL,omitempty"`          // URL of Jetstream or nil for random
 	Collections  []string `json:"collections,omitempty"`  // Filter by collection types (max 100)
 	Authors      []string `json:"authors,omitempty"`      // Filter by author DIDs/handles (max 10,000)
 	Cursor       *int64   `json:"cursor,omitempty"`       // Resume from Unix microsecond timestamp
@@ -99,7 +100,7 @@ type FirehoseOptions struct {
 	RequireHello bool     `json:"requireHello,omitempty"` // Pause until initial config
 }
 
-// StreamEvents opens a firehose connection with advanced filtering options
+// StreamEvents opens a Firehose connection with advanced filtering options
 // Uses options struct for complex configuration following Firefly's API patterns
 func (f *Firefly) StreamEvents(ctx context.Context, options *FirehoseOptions) (chan *FirehoseEvent, error) {
 	if options == nil {
@@ -247,14 +248,19 @@ func (f *Firefly) connectFirehose(ctx context.Context, options *FirehoseOptions,
 
 // buildJetstreamURL constructs the Jetstream WebSocket URL with query parameters
 func (f *Firefly) buildJetstreamURL(options *FirehoseOptions) string {
-	possibleUrls := []string{
-		"wss://jetstream1.us-east.bsky.network/subscribe",
-		"wss://jetstream2.us-east.bsky.network/subscribe",
-		"wss://jetstream1.us-west.bsky.network/subscribe",
-		"wss://jetstream2.us-west.bsky.network/subscribe",
+	baseURL := ""
+	if options.URL == nil || *options.URL == "" {
+		possibleUrls := []string{
+			"wss://jetstream1.us-east.bsky.network/subscribe",
+			"wss://jetstream2.us-east.bsky.network/subscribe",
+			"wss://jetstream1.us-west.bsky.network/subscribe",
+			"wss://jetstream2.us-west.bsky.network/subscribe",
+		}
+		// Use random endpoint
+		baseURL = possibleUrls[rand.Intn(len(possibleUrls))]
+	} else {
+		baseURL = *options.URL
 	}
-	// Use random endpoint
-	baseURL := possibleUrls[rand.Intn(4)]
 
 	var params []string
 
