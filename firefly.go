@@ -50,8 +50,8 @@ type Firefly struct {
 //	if err != nil {
 //	    log.Fatal(err)
 //	}
-func NewDefaultInstance() (*Firefly, error) {
-	return NewCustomInstance(context.Background(), defaultBskyServer, new(http.Client))
+func NewDefaultInstance(ctx context.Context) (*Firefly, error) {
+	return NewCustomInstance(ctx, defaultBskyServer, new(http.Client))
 }
 
 // NewCustomInstance creates a new Firefly client with custom configuration.
