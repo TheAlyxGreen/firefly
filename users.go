@@ -1,6 +1,7 @@
 package firefly
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -46,9 +47,13 @@ func OldToNewUserBasic(oldUser *bsky.ActorDefs_ProfileViewBasic) (*User, error) 
 	if oldUser == nil {
 		return nil, ErrNilUser
 	}
-	CreatedAt, err := time.Parse(time.RFC3339, *oldUser.CreatedAt)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrInvalidUser, err)
+	var CreatedAt time.Time
+	var err error
+	if oldUser.CreatedAt != nil {
+		CreatedAt, err = time.Parse(time.RFC3339, *oldUser.CreatedAt)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrInvalidUser, err)
+		}
 	}
 	return &User{
 		Avatar:      oldUser.Avatar,
@@ -64,13 +69,20 @@ func OldToNewUser(oldUser *bsky.ActorDefs_ProfileView) (*User, error) {
 	if oldUser == nil {
 		return nil, ErrNilUser
 	}
-	CreatedAt, err := time.Parse(time.RFC3339, *oldUser.CreatedAt)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrInvalidUser, err)
+	var CreatedAt time.Time
+	var err error
+	if oldUser.CreatedAt != nil {
+		CreatedAt, err = time.Parse(time.RFC3339, *oldUser.CreatedAt)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrInvalidUser, err)
+		}
 	}
-	IndexedAt, err := time.Parse(time.RFC3339, *oldUser.IndexedAt)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrInvalidUser, err)
+	var IndexedAt time.Time
+	if oldUser.IndexedAt != nil {
+		IndexedAt, err = time.Parse(time.RFC3339, *oldUser.IndexedAt)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrInvalidUser, err)
+		}
 	}
 	newUser := &User{
 		Avatar:      oldUser.Avatar,
@@ -91,13 +103,20 @@ func OldToNewDetailedUser(oldUser *bsky.ActorDefs_ProfileViewDetailed) (*User, e
 	if oldUser == nil {
 		return nil, ErrNilUser
 	}
-	CreatedAt, err := time.Parse(time.RFC3339, *oldUser.CreatedAt)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrInvalidUser, err)
+	var CreatedAt time.Time
+	var err error
+	if oldUser.CreatedAt != nil {
+		CreatedAt, err = time.Parse(time.RFC3339, *oldUser.CreatedAt)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrInvalidUser, err)
+		}
 	}
-	IndexedAt, err := time.Parse(time.RFC3339, *oldUser.IndexedAt)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrInvalidUser, err)
+	var IndexedAt time.Time
+	if oldUser.IndexedAt != nil {
+		IndexedAt, err = time.Parse(time.RFC3339, *oldUser.IndexedAt)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrInvalidUser, err)
+		}
 	}
 	var followersCount int
 	if oldUser.FollowersCount != nil {
@@ -135,15 +154,15 @@ func OldToNewDetailedUser(oldUser *bsky.ActorDefs_ProfileViewDetailed) (*User, e
 //
 // Example:
 //
-//	profile, err := client.GetProfile("alice.bsky.social")
+//	profile, err := client.GetProfile(context.Background(), "alice.bsky.social")
 //	if err != nil {
 //	    log.Fatal(err)
 //	}
 //	if profile.FollowersCount != nil {
 //	    fmt.Printf("%s has %d followers\n", *profile.DisplayName, *profile.FollowersCount)
 //	}
-func (f *Firefly) GetProfile(actor string) (*User, error) {
-	profile, err := bsky.ActorGetProfile(f.ctx, f.client, actor)
+func (f *Firefly) GetProfile(ctx context.Context, actor string) (*User, error) {
+	profile, err := bsky.ActorGetProfile(ctx, f.client, actor)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrFailedFetch, err)
 	}
@@ -153,9 +172,9 @@ func (f *Firefly) GetProfile(actor string) (*User, error) {
 
 // SearchUsers searches for BlueSky users matching the query string.
 // Returns basic user profiles (detailed fields like follower counts may be nil).
-func (f *Firefly) SearchUsers(query string, cursor string, limit int) ([]*User, error) {
+func (f *Firefly) SearchUsers(ctx context.Context, query string, cursor string, limit int) ([]*User, error) {
 
-	result, err := bsky.ActorSearchActors(f.ctx, f.client, cursor, int64(limit), query, "")
+	result, err := bsky.ActorSearchActors(ctx, f.client, cursor, int64(limit), query, "")
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrFailedFetch, err)
 	}
@@ -174,9 +193,9 @@ func (f *Firefly) SearchUsers(query string, cursor string, limit int) ([]*User, 
 
 // GetSuggestedUsers returns user suggestions from BlueSky's recommendation algorithm.
 // Returns basic user profiles (detailed fields like follower counts may be nil).
-func (f *Firefly) GetSuggestedUsers(cursor string, limit int) ([]*User, error) {
+func (f *Firefly) GetSuggestedUsers(ctx context.Context, cursor string, limit int) ([]*User, error) {
 
-	result, err := bsky.ActorGetSuggestions(f.ctx, f.client, cursor, int64(limit))
+	result, err := bsky.ActorGetSuggestions(ctx, f.client, cursor, int64(limit))
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrFailedFetch, err)
 	}

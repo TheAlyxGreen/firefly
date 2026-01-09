@@ -1,6 +1,7 @@
 package firefly
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -51,8 +52,8 @@ func ExtractDidFromUri(uri string) (string, error) {
 }
 
 // ResolveHandleToDID resolves a BlueSky handle to its corresponding DID using the XRPC API
-func (f *Firefly) ResolveHandleToDID(handle string) (string, error) {
-	output, err := atproto.IdentityResolveHandle(f.ctx, f.client, handle)
+func (f *Firefly) ResolveHandleToDID(ctx context.Context, handle string) (string, error) {
+	output, err := atproto.IdentityResolveHandle(ctx, f.client, handle)
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve handle to DID: %w", err)
 	}
@@ -60,12 +61,12 @@ func (f *Firefly) ResolveHandleToDID(handle string) (string, error) {
 }
 
 // ExtractOrResolveDidFromUri extracts a DID from an AT URI, resolving handles to DIDs when necessary
-func (f *Firefly) ExtractOrResolveDidFromUri(uri string) (string, error) {
+func (f *Firefly) ExtractOrResolveDidFromUri(ctx context.Context, uri string) (string, error) {
 	userID, err := ExtractDidFromUri(uri)
 	if err != nil {
 		if errors.Is(err, ErrNoDid) {
 			// userID is a handle, resolve it to a DID
-			return f.ResolveHandleToDID(userID)
+			return f.ResolveHandleToDID(ctx, userID)
 		}
 		// Other error (empty URI, invalid format, etc.)
 		return "", err

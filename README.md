@@ -38,7 +38,8 @@ func main() {
         log.Fatal(err)
     }
 
-    err = client.Login(context.Background(), "your-username", "your-password")
+    ctx := context.Background()
+    err = client.Login(ctx, "your-username", "your-password")
     if err != nil {
         log.Fatal(err)
     }
@@ -59,7 +60,8 @@ post := firefly.NewDraftPost().
     AddHashtag("golang")
 
 // Publish it
-result, err := client.PublishDraftPost(post)
+ctx := context.Background()
+result, err := client.PublishDraftPost(ctx, post)
 if err != nil {
     log.Fatal(err)
 }
@@ -71,14 +73,15 @@ fmt.Printf("Posted: %s\n", result.Uri)
 
 ```go
 // Get a post to reply to
-posts, err := client.SearchPosts("golang", 10, nil)
+ctx := context.Background()
+posts, err := client.SearchPosts(ctx, "golang", 10, nil)
 if err != nil {
     log.Fatal(err)
 }
 
 // Create a reply (threading handled automatically)
 reply := firefly.NewDraftPost().AddText("Great point!")
-result, err := client.PostReply(posts[0], reply)
+result, err := client.PostReply(ctx, posts[0], reply)
 if err != nil {
     log.Fatal(err)
 }
@@ -88,13 +91,14 @@ if err != nil {
 
 ```go
 // Simple search
-posts, err := client.SearchPosts("golang", 25, nil)
+ctx := context.Background()
+posts, err := client.SearchPosts(ctx, "golang", 25, nil)
 if err != nil {
     log.Fatal(err)
 }
 
 // Search with filters
-posts, err = client.SearchPosts("climate", 50, &firefly.PostSearch{
+posts, err = client.SearchPosts(ctx, "climate", 50, &firefly.PostSearch{
     Author:   "scientist.bsky.social",
     Language: "en",
     SortBy:   firefly.SortByTop,
@@ -130,7 +134,8 @@ for event := range events {
 ## Notifications
 
 ```go
-notifications, err := client.GetNotifications(context.Background(), "", 25)
+ctx := context.Background()
+notifications, err := client.GetNotifications(ctx, time.Now(), 25, false, nil)
 if err != nil {
     log.Fatal(err)
 }

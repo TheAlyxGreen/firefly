@@ -1,6 +1,7 @@
 package firefly
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -38,7 +39,7 @@ type PostSearch struct {
 
 // SearchPosts searches for posts with optional filters.
 // Pass nil for options to search without filters.
-func (f *Firefly) SearchPosts(query string, limit int, options *PostSearch) ([]*FeedPost, error) {
+func (f *Firefly) SearchPosts(ctx context.Context, query string, limit int, options *PostSearch) ([]*FeedPost, error) {
 	if options == nil {
 		options = &PostSearch{}
 	}
@@ -54,7 +55,7 @@ func (f *Firefly) SearchPosts(query string, limit int, options *PostSearch) ([]*
 		toTime = options.Until.Format(time.RFC3339)
 	}
 	results, err := bsky.FeedSearchPosts(
-		f.ctx, f.client, options.Author, options.Cursor,
+		ctx, f.client, options.Author, options.Cursor,
 		options.Domain, options.Language, int64(limit),
 		options.Mentions, query, fromTime, string(options.SortBy),
 		options.Tags, toTime, options.URL)

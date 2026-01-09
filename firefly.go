@@ -29,7 +29,6 @@ var (
 // for common BlueSky operations like searching posts and fetching notifications.
 type Firefly struct {
 	client            *xrpc.Client
-	ctx               context.Context
 	sessionExpiration time.Time
 	cancelRefresh     context.CancelFunc
 
@@ -74,7 +73,6 @@ func NewCustomInstance(ctx context.Context, server string, client *http.Client) 
 	}
 
 	return &Firefly{
-		ctx:           ctx,
 		client:        local,
 		ErrorChan:     make(chan error),
 		cancelRefresh: nil,
@@ -87,20 +85,20 @@ func NewCustomInstance(ctx context.Context, server string, client *http.Client) 
 //
 // Example:
 //
-//	err := client.Login("alice.bsky.social", "my-app-password")
+//	err := client.Login(context.Background(), "alice.bsky.social", "my-app-password")
 //	if err != nil {
 //	    log.Fatal("Login failed:", err)
 //	}
 //	fmt.Printf("Logged in as: %s\n", client.Self.DisplayName)
-func (f *Firefly) Login(username string, password string) error {
-	if _, err := atproto.ServerDescribeServer(f.ctx, f.client); err != nil {
+func (f *Firefly) Login(ctx context.Context, username string, password string) error {
+	if _, err := atproto.ServerDescribeServer(ctx, f.client); err != nil {
 		return fmt.Errorf("%w: %w", ErrBadServer, err)
 	}
 	authInput := atproto.ServerCreateSession_Input{
 		Identifier: username,
 		Password:   password,
 	}
-	authOutput, err := atproto.ServerCreateSession(f.ctx, f.client, &authInput)
+	authOutput, err := atproto.ServerCreateSession(ctx, f.client, &authInput)
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrBadLogin, err)
 	}
@@ -128,7 +126,7 @@ func (f *Firefly) Login(username string, password string) error {
 
 	f.scheduleSessionRefresh()
 
-	profile, err := bsky.ActorGetProfile(f.ctx, f.client, authOutput.Handle)
+	profile, err := bsky.ActorGetProfile(ctx, f.client, authOutput.Handle)
 	if err == nil {
 		selfUser, err := OldToNewDetailedUser(profile)
 		if err == nil {
@@ -140,8 +138,8 @@ func (f *Firefly) Login(username string, password string) error {
 }
 
 // updateSession refreshes the session tokens, updates expiration time, and checks the session duration for validity.
-func (f *Firefly) updateSession() error {
-	authOutput, err := atproto.ServerRefreshSession(f.ctx, f.client)
+func (f *Firefly) updateSession(ctx context.Context) error {
+	authOutput, err := atproto.ServerRefreshSession(ctx, f.client)
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrFailedRefresh, err)
 	}
@@ -179,7 +177,11 @@ func (f *Firefly) scheduleSessionRefresh() {
 		case <-refreshCtx.Done():
 			return
 		default:
-			err := f.updateSession()
+			// Create a context with timeout for the refresh operation
+			ctx, cancelOp := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancelOp()
+
+			err := f.updateSession(ctx)
 			if err != nil {
 				f.ErrorChan <- err
 				f.cancelRefresh = nil
@@ -196,11 +198,11 @@ func (f *Firefly) scheduleSessionRefresh() {
 //
 // This is typically not needed as Firefly handles token refresh automatically,
 // but can be useful if you suspect the token is invalid or want to refresh proactively.
-func (f *Firefly) RefreshSession() {
+func (f *Firefly) RefreshSession(ctx context.Context) {
 	if f.cancelRefresh != nil {
 		f.cancelRefresh()
 	}
-	err := f.updateSession()
+	err := f.updateSession(ctx)
 	if err != nil {
 		f.ErrorChan <- err
 		f.cancelRefresh = nil

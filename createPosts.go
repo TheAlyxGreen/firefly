@@ -1,6 +1,7 @@
 package firefly
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -173,7 +174,7 @@ func (d *DraftPost) SetReplyInfo(parent, root *PostRef) *DraftPost {
 // PostReply creates a reply to an existing post, automatically handling thread structure
 // If originalPost is a root post, the new reply becomes a direct reply
 // If originalPost is already a reply in a thread, the new reply maintains the thread root
-func (f *Firefly) PostReply(originalPost *FeedPost, newPost *DraftPost) (*PostRef, error) {
+func (f *Firefly) PostReply(ctx context.Context, originalPost *FeedPost, newPost *DraftPost) (*PostRef, error) {
 	// Determine parent and root based on the original post's reply structure
 	parent := &PostRef{
 		Uri: originalPost.Uri,
@@ -193,7 +194,7 @@ func (f *Firefly) PostReply(originalPost *FeedPost, newPost *DraftPost) (*PostRe
 	newPost.SetReplyInfo(parent, root)
 
 	// Create the post normally - the reply structure is now set
-	return f.PublishDraftPost(newPost)
+	return f.PublishDraftPost(ctx, newPost)
 }
 
 // GetText returns the complete text content of the draft post
@@ -228,7 +229,7 @@ func (d *DraftPost) IsValid() error {
 }
 
 // DraftToBskyPost converts the draft post to a BlueSky FeedPost with automatic facet generation
-func (f *Firefly) DraftToBskyPost(draft *DraftPost) (*bsky.FeedPost, error) {
+func (f *Firefly) DraftToBskyPost(ctx context.Context, draft *DraftPost) (*bsky.FeedPost, error) {
 	// Validate the post first
 	if err := draft.IsValid(); err != nil {
 		return nil, err
@@ -257,7 +258,7 @@ func (f *Firefly) DraftToBskyPost(draft *DraftPost) (*bsky.FeedPost, error) {
 			userDID := *fragment.UserDID
 			if !strings.HasPrefix(userDID, "did:") {
 				// This is a handle, resolve it to DID
-				resolvedDID, err := f.ResolveHandleToDID(userDID)
+				resolvedDID, err := f.ResolveHandleToDID(ctx, userDID)
 				if err != nil {
 					return nil, fmt.Errorf("failed to resolve handle %s: %w", userDID, err)
 				}
@@ -373,15 +374,15 @@ func (f *Firefly) DraftToBskyPost(draft *DraftPost) (*bsky.FeedPost, error) {
 }
 
 // PublishDraftPost publishes a draft post to BlueSky
-func (f *Firefly) PublishDraftPost(draft *DraftPost) (*PostRef, error) {
+func (f *Firefly) PublishDraftPost(ctx context.Context, draft *DraftPost) (*PostRef, error) {
 	// Convert to BlueSky format with automatic facet generation
-	bskyPost, err := f.DraftToBskyPost(draft)
+	bskyPost, err := f.DraftToBskyPost(ctx, draft)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert draft post: %w", err)
 	}
 
 	// Create the post using BlueSky's API
-	resp, err := atproto.RepoCreateRecord(f.ctx, f.client, &atproto.RepoCreateRecord_Input{
+	resp, err := atproto.RepoCreateRecord(ctx, f.client, &atproto.RepoCreateRecord_Input{
 		Collection: "app.bsky.feed.post",
 		Repo:       f.Self.Did, // Use authenticated user's DID
 		Record: &lexutil.LexiconTypeDecoder{

@@ -1,6 +1,7 @@
 package firefly
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -165,8 +166,8 @@ func (notif Notification) String() string {
 //   - count: Maximum number of notifications to return (1-100)
 //   - priority: If true, only return notifications marked as priority by the server
 //   - reasons: Filter by notification types (e.g., ["like", "follow"]). Pass nil for all types.
-func (f *Firefly) GetNotifications(fromBefore time.Time, count int, priority bool, reasons []string) ([]*Notification, error) {
-	notifications, err := bsky.NotificationListNotifications(f.ctx, f.client, fromBefore.Format(time.RFC3339), int64(count), priority, reasons, "")
+func (f *Firefly) GetNotifications(ctx context.Context, fromBefore time.Time, count int, priority bool, reasons []string) ([]*Notification, error) {
+	notifications, err := bsky.NotificationListNotifications(ctx, f.client, fromBefore.Format(time.RFC3339), int64(count), priority, reasons, "")
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrFailedFetch, err)
 	}
@@ -189,8 +190,8 @@ func (f *Firefly) GetNotifications(fromBefore time.Time, count int, priority boo
 
 // GetLatestNotifications is a convenience method that returns the most recent notifications.
 // This is equivalent to calling GetNotifications with time.Now() and no filters.
-func (f *Firefly) GetLatestNotifications(count int) ([]*Notification, error) {
-	notifications, err := f.GetNotifications(time.Now(), count, false, nil)
+func (f *Firefly) GetLatestNotifications(ctx context.Context, count int) ([]*Notification, error) {
+	notifications, err := f.GetNotifications(ctx, time.Now(), count, false, nil)
 	if err != nil {
 		return nil, err
 	}
