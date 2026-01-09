@@ -165,7 +165,18 @@ func (f *Firefly) OldToNewPostView(oldPostView *bsky.FeedDefs_PostView) (*FeedPo
 	if oldPostView == nil {
 		return nil, ErrNilPost
 	}
-	oldPost := oldPostView.Record.Val.(*bsky.FeedPost)
+
+	// Safely handle the record type assertion
+	if oldPostView.Record == nil || oldPostView.Record.Val == nil {
+		return nil, fmt.Errorf("%w: missing record", ErrInvalidPost)
+	}
+
+	oldPost, ok := oldPostView.Record.Val.(*bsky.FeedPost)
+	if !ok {
+		// The record might be a different type (e.g. not a post, or a map if decoding failed)
+		return nil, fmt.Errorf("%w: record is not a FeedPost", ErrInvalidPost)
+	}
+
 	newPost, err := f.OldToNewPost(oldPost, oldPostView.Author.Did)
 	if err != nil {
 		return nil, err
