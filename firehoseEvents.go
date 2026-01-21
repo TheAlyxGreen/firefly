@@ -68,8 +68,8 @@ func (f *Firefly) processPostEvent(event *FirehoseEvent, commit *models.Commit) 
 	}
 
 	// Set URI and CID from commit data
-	fireflyPost.Uri = fmt.Sprintf("at://%s/%s/%s", event.Repo, commit.Collection, commit.RKey)
-	fireflyPost.Cid = commit.CID
+	fireflyPost.URI = fmt.Sprintf("at://%s/%s/%s", event.Repo, commit.Collection, commit.RKey)
+	fireflyPost.CID = commit.CID
 
 	event.Type = EventTypePost
 	event.Post = fireflyPost
@@ -110,8 +110,8 @@ func (f *Firefly) processLikeEvent(event *FirehoseEvent, commit *models.Commit) 
 	event.Type = EventTypeLike
 	event.LikeEvent = &FirehoseLike{
 		Subject: &PostRef{
-			Uri: likeRecord.Subject.URI,
-			Cid: likeRecord.Subject.CID,
+			URI: likeRecord.Subject.URI,
+			CID: likeRecord.Subject.CID,
 		},
 		URI: fmt.Sprintf("at://%s/%s/%s", event.Repo, commit.Collection, commit.RKey),
 	}
@@ -152,8 +152,8 @@ func (f *Firefly) processRepostEvent(event *FirehoseEvent, commit *models.Commit
 	event.Type = EventTypeRepost
 	event.RepostEvent = &FirehoseRepost{
 		Subject: &PostRef{
-			Uri: repostRecord.Subject.URI,
-			Cid: repostRecord.Subject.CID,
+			URI: repostRecord.Subject.URI,
+			CID: repostRecord.Subject.CID,
 		},
 		URI: fmt.Sprintf("at://%s/%s/%s", event.Repo, commit.Collection, commit.RKey),
 	}

@@ -155,8 +155,8 @@ func (f *Firefly) OldToNewNotification(oldNotif *bsky.NotificationListNotificati
 				newPost.Author = newNotif.LinkedUser
 			}
 			newNotif.LinkedPost = newPost
-			newNotif.LinkedPost.Uri = oldNotif.Uri
-			newNotif.LinkedPost.Cid = oldNotif.Cid
+			newNotif.LinkedPost.URI = oldNotif.Uri
+			newNotif.LinkedPost.CID = oldNotif.Cid
 		}
 	}
 
@@ -166,7 +166,7 @@ func (f *Firefly) OldToNewNotification(oldNotif *bsky.NotificationListNotificati
 func (notif Notification) String() string {
 	if notif.LinkedPost != nil {
 		return fmt.Sprintf("Notification{User: %s, Reason: %s, Post: %s}",
-			notif.LinkedUser.Handle, notif.Reason, notif.LinkedPost.Uri)
+			notif.LinkedUser.Handle, notif.Reason, notif.LinkedPost.URI)
 	}
 	return fmt.Sprintf("Notification{User: %s, Reason: %s}", notif.LinkedUser.Handle, notif.Reason)
 }

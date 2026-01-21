@@ -73,7 +73,7 @@ func (e Embed) String() string {
 		return fmt.Sprintf("Embed{Type: %s}", e.Type)
 	case EmbedTypeRecord:
 		if e.Record != nil {
-			return fmt.Sprintf("Embed{Type: %s, URI: %s}", e.Type, e.Record.Uri)
+			return fmt.Sprintf("Embed{Type: %s, URI: %s}", e.Type, e.Record.URI)
 		}
 		return fmt.Sprintf("Embed{Type: %s}", e.Type)
 	case EmbedTypeVideo:
@@ -137,8 +137,8 @@ func (f *Firefly) OldToNewEmbed(oldEmbed *bsky.FeedPost_Embed, authorDID string)
 	if oldEmbed.EmbedRecord != nil && oldEmbed.EmbedRecord.Record != nil {
 		embed.Type = EmbedTypeRecord
 		embed.Record = &PostRef{
-			Cid: oldEmbed.EmbedRecord.Record.Cid,
-			Uri: oldEmbed.EmbedRecord.Record.Uri,
+			CID: oldEmbed.EmbedRecord.Record.Cid,
+			URI: oldEmbed.EmbedRecord.Record.Uri,
 		}
 	}
 
@@ -168,8 +168,8 @@ func (f *Firefly) OldToNewEmbed(oldEmbed *bsky.FeedPost_Embed, authorDID string)
 		embed.Type = EmbedTypeRecord
 		if oldEmbed.EmbedRecordWithMedia.Record != nil && oldEmbed.EmbedRecordWithMedia.Record.Record != nil {
 			embed.Record = &PostRef{
-				Cid: oldEmbed.EmbedRecordWithMedia.Record.Record.Cid,
-				Uri: oldEmbed.EmbedRecordWithMedia.Record.Record.Uri,
+				CID: oldEmbed.EmbedRecordWithMedia.Record.Record.Cid,
+				URI: oldEmbed.EmbedRecordWithMedia.Record.Record.Uri,
 			}
 		}
 	}

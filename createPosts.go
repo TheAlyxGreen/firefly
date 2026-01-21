@@ -177,8 +177,8 @@ func (d *DraftPost) SetReplyInfo(parent, root *PostRef) *DraftPost {
 func (f *Firefly) PostReply(ctx context.Context, originalPost *FeedPost, newPost *DraftPost) (*PostRef, error) {
 	// Determine parent and root based on the original post's reply structure
 	parent := &PostRef{
-		Uri: originalPost.Uri,
-		Cid: originalPost.Cid,
+		URI: originalPost.URI,
+		CID: originalPost.CID,
 	}
 
 	var root *PostRef
@@ -363,12 +363,12 @@ func (f *Firefly) DraftToBskyPost(ctx context.Context, draft *DraftPost) (*bsky.
 	if draft.ReplyInfo != nil {
 		post.Reply = &bsky.FeedPost_ReplyRef{
 			Parent: &atproto.RepoStrongRef{
-				Uri: draft.ReplyInfo.ReplyTarget.Uri,
-				Cid: draft.ReplyInfo.ReplyTarget.Cid,
+				Uri: draft.ReplyInfo.ReplyTarget.URI,
+				Cid: draft.ReplyInfo.ReplyTarget.CID,
 			},
 			Root: &atproto.RepoStrongRef{
-				Uri: draft.ReplyInfo.ReplyRoot.Uri,
-				Cid: draft.ReplyInfo.ReplyRoot.Cid,
+				Uri: draft.ReplyInfo.ReplyRoot.URI,
+				Cid: draft.ReplyInfo.ReplyRoot.CID,
 			},
 		}
 	}
@@ -401,7 +401,7 @@ func (f *Firefly) PublishDraftPost(ctx context.Context, draft *DraftPost) (*Post
 
 	// Return a PostRef for the created post
 	return &PostRef{
-		Uri: resp.Uri,
-		Cid: resp.Cid,
+		URI: resp.Uri,
+		CID: resp.Cid,
 	}, nil
 }

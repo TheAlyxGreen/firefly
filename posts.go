@@ -19,20 +19,20 @@ var (
 )
 
 // PostRef provides a content-addressed reference to a BlueSky post.
-// The Uri points to the post's location, while the Cid is a cryptographic hash of the post content.
+// The URI points to the post's location, while the CID is a cryptographic hash of the post content.
 type PostRef struct {
-	Cid string `json:"cid" cborgen:"cid"` // hash of the content of the post
-	Uri string `json:"uri" cborgen:"uri"` // pointer to the location of the post
+	CID string `json:"cid" cborgen:"cid"` // hash of the content of the post
+	URI string `json:"uri" cborgen:"uri"` // pointer to the location of the post
 }
 
-// IsValid validates the format of both the Cid and Uri. It does not check if they actually work/exist, just that they
+// IsValid validates the format of both the CID and URI. It does not check if they actually work/exist, just that they
 // are formatted correctly
 func (ref *PostRef) IsValid() bool {
-	_, err := syntax.ParseCID(ref.Cid)
+	_, err := syntax.ParseCID(ref.CID)
 	if err != nil {
 		return false
 	}
-	_, err = syntax.ParseATURI(ref.Uri)
+	_, err = syntax.ParseATURI(ref.URI)
 	if err != nil {
 		return false
 	}
@@ -45,8 +45,8 @@ func OldToNewRefPointer(oldRef *atproto.RepoStrongRef) *PostRef {
 		return nil
 	}
 	return &PostRef{
-		Cid: oldRef.Cid,
-		Uri: oldRef.Uri,
+		CID: oldRef.Cid,
+		URI: oldRef.Uri,
 	}
 }
 
@@ -59,10 +59,10 @@ type ReplyInfo struct { // nil if not a reply
 
 // FeedPost represents a BlueSky post with all its content and metadata.
 // This includes the post text, rich text formatting, creation time, language, and thread information.
-// Some fields like Uri, Cid, and Author may be populated depending on the context where the post was retrieved.
+// Some fields like URI, CID, and Author may be populated depending on the context where the post was retrieved.
 type FeedPost struct {
-	Uri         string          `json:"uri" cborgen:"uri"`       // may be empty
-	Cid         string          `json:"cid" cborgen:"cid"`       // may be empty
+	URI         string          `json:"uri" cborgen:"uri"`       // may be empty
+	CID         string          `json:"cid" cborgen:"cid"`       // may be empty
 	Author      *User           `json:"author" cborgen:"author"` // may be nil
 	CreatedAt   *time.Time      `json:"createdAt" cborgen:"createdAt"`
 	IndexedAt   *time.Time      `json:"indexedAt" cborgen:"indexedAt"`
@@ -88,7 +88,7 @@ func (p FeedPost) String() string {
 	safeText := strings.Replace(p.Text, "\n", "\\n", -1)
 	replyText := ""
 	if p.ReplyInfo != nil {
-		replyText = ", ReplyTo: " + p.ReplyInfo.ReplyTarget.Uri
+		replyText = ", ReplyTo: " + p.ReplyInfo.ReplyTarget.URI
 	}
 	return fmt.Sprintf("FeedPost{Timestamp: %s, Text: '%s%s'}", timestamp, safeText, replyText)
 }
@@ -118,15 +118,15 @@ func (f *Firefly) OldToNewPost(oldPost *bsky.FeedPost, authorDID string) (*FeedP
 	if oldPost.Reply != nil && oldPost.Reply.Parent != nil {
 		NewReplyInfo = &ReplyInfo{
 			ReplyTarget: &PostRef{
-				Cid: oldPost.Reply.Parent.Cid,
-				Uri: oldPost.Reply.Parent.Uri,
+				CID: oldPost.Reply.Parent.Cid,
+				URI: oldPost.Reply.Parent.Uri,
 			},
 			ReplyRoot: nil,
 		}
 		if oldPost.Reply.Root != nil {
 			NewReplyInfo.ReplyRoot = &PostRef{
-				Cid: oldPost.Reply.Root.Cid,
-				Uri: oldPost.Reply.Root.Uri,
+				CID: oldPost.Reply.Root.Cid,
+				URI: oldPost.Reply.Root.Uri,
 			}
 		}
 	}
@@ -182,8 +182,8 @@ func (f *Firefly) OldToNewPostView(oldPostView *bsky.FeedDefs_PostView) (*FeedPo
 		return nil, err
 	}
 	newPost.RawDetailed = oldPostView
-	newPost.Uri = oldPostView.Uri
-	newPost.Cid = oldPostView.Cid
+	newPost.URI = oldPostView.Uri
+	newPost.CID = oldPostView.Cid
 
 	var likes int
 	if oldPostView.LikeCount != nil {
