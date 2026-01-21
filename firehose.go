@@ -31,22 +31,28 @@ const (
 	EventTypeProfile
 	EventTypeDelete
 	EventTypeRepost
+	EventTypeIdentity
+	EventTypeAccount
 )
 
 func (et FirehoseEventType) String() string {
 	switch et {
 	case EventTypePost:
-		return "Post"
+		return "Post Event"
 	case EventTypeLike:
-		return "Like"
+		return "Like Event"
 	case EventTypeFollow:
-		return "Follow"
+		return "Follow Event"
 	case EventTypeProfile:
-		return "Profile"
+		return "Profile Event"
 	case EventTypeDelete:
-		return "Delete"
+		return "Delete Event"
 	case EventTypeRepost:
-		return "Repost"
+		return "Repost Event"
+	case EventTypeIdentity:
+		return "Identity Event"
+	case EventTypeAccount:
+		return "Account Event"
 	default:
 		return "Unknown"
 	}
@@ -60,12 +66,13 @@ type FirehoseEvent struct {
 	Timestamp time.Time         `json:"timestamp"`
 
 	// Event-specific data (only one will be populated)
-	Post        *FeedPost       `json:"post,omitempty"`
-	User        *User           `json:"user,omitempty"`        // For profile updates, follows
-	DeleteEvent *FirehoseDelete `json:"deleteEvent,omitempty"` // For deletions
-	LikeEvent   *FirehoseLike   `json:"likeEvent,omitempty"`   // For likes
-	RepostEvent *FirehoseRepost `json:"repostEvent,omitempty"` // For reposts
-
+	Post          *FeedPost         `json:"post,omitempty"`
+	User          *User             `json:"user,omitempty"`        // For profile updates, follows
+	DeleteEvent   *FirehoseDelete   `json:"deleteEvent,omitempty"` // For deletions
+	LikeEvent     *FirehoseLike     `json:"likeEvent,omitempty"`   // For likes
+	RepostEvent   *FirehoseRepost   `json:"repostEvent,omitempty"` // For reposts
+	IdentityEvent *FirehoseIdentity `json:"identity,omitempty"`    // For identity updates
+	AccountEvent  *FirehoseAccount  `json:"account,omitempty"`     // For account status changes
 	// Raw Jetstream data preservation
 	RawCommit *models.Event
 }
@@ -87,6 +94,23 @@ type FirehoseLike struct {
 type FirehoseRepost struct {
 	Subject *PostRef `json:"subject"` // Post being reposted
 	URI     string   `json:"uri"`     // URI of the repost record
+}
+
+// FirehoseIdentity represents an identity update (handle change, etc.)
+type FirehoseIdentity struct {
+	DID    string    `json:"did"`
+	Handle string    `json:"handle"`
+	Seq    int64     `json:"seq"`
+	Time   time.Time `json:"time"`
+}
+
+// FirehoseAccount represents an account status change (active/suspended)
+type FirehoseAccount struct {
+	DID    string    `json:"did"`
+	Active bool      `json:"active"`
+	Status string    `json:"status,omitempty"` // e.g. "takendown"
+	Seq    int64     `json:"seq"`
+	Time   time.Time `json:"time"`
 }
 
 // FirehoseOptions configures Firehose filtering and behavior

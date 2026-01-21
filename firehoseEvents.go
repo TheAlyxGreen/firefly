@@ -3,6 +3,7 @@ package firefly
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/bluesky-social/indigo/api/bsky"
 	"github.com/bluesky-social/jetstream/pkg/models"
@@ -272,8 +273,18 @@ func (f *Firefly) processIdentityEvent(event *FirehoseEvent, commit *models.Even
 		Did:    identity.Did,
 		Handle: handle,
 	}
+	var identEvent FirehoseIdentity
+	identEvent.DID = identity.Did
+	identEvent.Handle = handle
+	identEvent.Seq = identity.Seq
 
-	event.Type = EventTypeProfile
+	timestamp, err := time.Parse(time.RFC3339, identity.Time)
+	if err == nil {
+		identEvent.Time = timestamp
+	}
+
+	event.IdentityEvent = &identEvent
+	event.Type = EventTypeIdentity
 	event.User = user
 	return event, nil
 }
@@ -293,7 +304,22 @@ func (f *Firefly) processAccountEvent(event *FirehoseEvent, commit *models.Event
 		Handle: "", // Not available in account events
 	}
 
-	event.Type = EventTypeProfile
+	var accountEvent FirehoseAccount
+	accountEvent.DID = account.Did
+	accountEvent.Active = account.Active
+	accountEvent.Seq = account.Seq
+
+	if account.Status != nil {
+		accountEvent.Status = *account.Status
+	}
+
+	timestamp, err := time.Parse(time.RFC3339, account.Time)
+	if err == nil {
+		accountEvent.Time = timestamp
+	}
+
+	event.AccountEvent = &accountEvent
+	event.Type = EventTypeAccount
 	event.User = user
 	return event, nil
 }
